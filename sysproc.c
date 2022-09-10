@@ -89,3 +89,29 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// sets the nice value of the specified process
+// clamps bound of the nice value
+int sys_set_priority(void)
+{
+  int pid;
+  int nice;
+
+  // load pid
+  if(argint(0, &pid) < 0)
+    return -1;
+
+  // load nice
+  if(argint(0, &nice) < 0)
+    return -1;
+
+  // Clamp value if nessary
+  if (nice < 0){
+      nice = 0;
+  } else if (nice > 39){
+      nice = 39;
+  }
+
+  return set_priority(pid, nice);
+}
+
