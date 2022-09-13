@@ -552,3 +552,24 @@ set_priority(int pid, int nice)
   release(&ptable.lock);
   return -1;
 }
+
+//get nice value of process
+int
+get_priority(int pid)
+{
+  struct proc *p;
+  int prio;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    cprintf("%d %s\n", p->pid, p->name); //for debug purposes
+
+    if(p->pid == pid){
+      prio = p->priority;
+      release(&ptable.lock);
+      return prio;
+    }
+  }
+  release(&ptable.lock);
+  return -1;
+}

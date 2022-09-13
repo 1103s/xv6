@@ -104,6 +104,7 @@ extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
 extern int sys_set_priority(void);
+extern int sys_get_priority(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -128,6 +129,7 @@ static int (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_set_priority]   sys_set_priority,
+[SYS_get_priority]   sys_get_priority,
 };
 
 
@@ -154,6 +156,7 @@ const char *sys_call_names[] = {"Place Holder",
                 "mkdir",
                 "close",
                 "set_priority",
+                "get_priority",
                 };
 void
 syscall(void)
@@ -164,7 +167,7 @@ syscall(void)
   num = curproc->tf->eax;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     curproc->tf->eax = syscalls[num]();
-    cprintf("\n%s -> %d\n", sys_call_names[num], curproc->tf->eax);
+    //cprintf("\n%s -> %d\n", sys_call_names[num], curproc->tf->eax);
 
   } else {
     cprintf("%d %s: unknown sys call %d\n",

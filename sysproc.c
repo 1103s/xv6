@@ -115,3 +115,15 @@ int sys_set_priority(void)
   return set_priority(pid, nice);
 }
 
+int sys_get_priority(void)
+{
+  int pid;
+
+  //if invalid pid
+  if(argint(0, &pid) < 0)
+    return -1;
+
+  return get_priority(pid);
+
+
+}
