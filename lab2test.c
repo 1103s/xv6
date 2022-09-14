@@ -14,7 +14,7 @@ int main(int argc, char **argv)
 
     //check if priority out of range
     if(priority > 19 || priority < -20)
-        printf("Priority is not a value between -20 and +19\n");
+        printf(stdout, "Priority is not a value between -20 and +19\n");
 
     //set priority of process with pid 2 to 12
     printf(stdout, "Setting process pid 2 to priority 12, set_priority returns %d\n", set_priority(2, 12));
@@ -25,7 +25,7 @@ int main(int argc, char **argv)
 
     //check if priority out of range
     if(priority > 19 || priority < -20)
-        printf("Priority is not a value between -20 and +19\n");
+        printf(stdout, "Priority is not a value between -20 and +19\n");
 
     
 
