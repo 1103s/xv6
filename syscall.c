@@ -167,7 +167,7 @@ syscall(void)
   num = curproc->tf->eax;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     curproc->tf->eax = syscalls[num]();
-    //cprintf("\n%s -> %d\n", sys_call_names[num], curproc->tf->eax);
+    cprintf("\n%s -> %d\n", sys_call_names[num], curproc->tf->eax);
 
   } else {
     cprintf("%d %s: unknown sys call %d\n",

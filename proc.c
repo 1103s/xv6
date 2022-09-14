@@ -562,7 +562,7 @@ get_priority(int pid)
 
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    cprintf("%d %s\n", p->pid, p->name); //for debug purposes
+    //cprintf("%d %s\n", p->pid, p->name); //for debug purposes
 
     if(p->pid == pid){
       prio = p->priority;

@@ -7,17 +7,13 @@ int stdout = 1;
 int main(int argc, char **argv)
 {
     
-    //get priority of porcess pid 2, the shell
-    
+    //get priority of porcess pid 2, the shell, expects 20
     printf(stdout, "priority of process 2 is %d \n", get_priority(2));
-    //set priority of process pid 5 to 10
-    
-    //set_priority(2, 10);
-    int priority = 10;
-    printf(stdout, "Setting process pid 2 to priority 10, set_priority returns %d\n", set_priority(2, priority));
 
-    //get priority of this process again
-    
+    //set priority of process with pid 2 to 12
+    printf(stdout, "Setting process pid 2 to priority 12, set_priority returns %d\n", set_priority(2, 12));
+
+    //get priority of this process again to confirm change
     printf(stdout, "priority of process 2 AFTER setting is %d\n", get_priority(2));
 
     exit();
