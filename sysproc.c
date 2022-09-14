@@ -102,7 +102,7 @@ int sys_set_priority(void)
     return -1;
 
   // load nice
-  if(argint(0, &nice) < 0)
+  if(argint(1, &nice) < 0)
     return -1;
 
   // Clamp value if nessary

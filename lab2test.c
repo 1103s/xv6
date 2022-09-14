@@ -12,8 +12,9 @@ int main(int argc, char **argv)
     printf(stdout, "priority of process 2 is %d \n", get_priority(2));
     //set priority of process pid 5 to 10
     
-    set_priority(2, 10);
-    printf(stdout, "Setting process pid 2 to priority 10\n");
+    //set_priority(2, 10);
+    int priority = 10;
+    printf(stdout, "Setting process pid 2 to priority 10, set_priority returns %d\n", set_priority(2, priority));
 
     //get priority of this process again
     
