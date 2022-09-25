@@ -7,6 +7,9 @@
 #include "x86.h"
 #include "syscall.h"
 
+//ENABLE printing of sys calls
+#define DEBUG 0
+
 // User code makes a system call with INT T_SYSCALL.
 // System call number in %eax.
 // Arguments on the stack, from the user call to the C
@@ -105,6 +108,7 @@ extern int sys_write(void);
 extern int sys_uptime(void);
 extern int sys_set_priority(void);
 extern int sys_get_priority(void);
+extern int sys_cps(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -130,6 +134,7 @@ static int (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 [SYS_set_priority]   sys_set_priority,
 [SYS_get_priority]   sys_get_priority,
+[SYS_cps]   sys_cps,
 };
 
 
@@ -157,6 +162,7 @@ const char *sys_call_names[] = {"Place Holder",
                 "close",
                 "set_priority",
                 "get_priority",
+                "cps",
                 };
 void
 syscall(void)
@@ -167,7 +173,9 @@ syscall(void)
   num = curproc->tf->eax;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     curproc->tf->eax = syscalls[num]();
-    cprintf("\n%s -> %d\n", sys_call_names[num], curproc->tf->eax);
+    if(DEBUG){
+        cprintf("\n%s -> %d\n", sys_call_names[num], curproc->tf->eax);
+    }
 
   } else {
     cprintf("%d %s: unknown sys call %d\n",

@@ -127,3 +127,10 @@ int sys_get_priority(void)
 
 
 }
+
+int sys_cps(void)
+{
+
+  return cps();
+
+}

@@ -7,6 +7,9 @@
 #include "proc.h"
 #include "spinlock.h"
 
+//Enable priority based secure
+#define PRIORITY 1
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -198,7 +201,7 @@ fork(void)
   }
   np->sz = curproc->sz;
   np->parent = curproc;
-  np->priority = 20;
+  np->priority = 10;
   *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
@@ -326,6 +329,7 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
+  struct proc *top_proc;
   
   for(;;){
     // Enable interrupts on this processor.
@@ -333,9 +337,26 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+    for(p = top_proc = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE){
+        top_proc++;
         continue;
+      }
+      
+      // find the nice-est runnable process if that is turned on
+      if(PRIORITY && (top_proc->priority > p->priority)){
+        top_proc = p;
+        if(p < &ptable.proc[NPROC]){
+          continue;
+        } else {
+          p = top_proc;
+        }
+      }
+
+
+          
+          
+        
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
@@ -572,4 +593,29 @@ get_priority(int pid)
   }
   release(&ptable.lock);
   return -1;
+}
+
+// current process status
+int 
+cps()
+{
+    struct proc *p;
+    // Enable interrupts on this processor
+    sti();
+    // Loop over process table looking for process with pid
+    acquire(&ptable.lock);
+    cprintf("name \t pid \t state \t priority \n");
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state == SLEEPING)
+            cprintf("%s \t %d \t SLEEPING \t %d \n", p->name, p->pid,
+                    p->priority);
+        else if(p->state == RUNNING)
+            cprintf("%s \t %d \t RUNNING \t %d \n", p->name, p->pid,
+                    p->priority);
+        else if(p->state == RUNNABLE)
+            cprintf("%s \t %d \t RUNNABLE \t %d \n", p->name, p->pid,
+                    p->priority);
+    }
+    release(&ptable.lock);
+    return 22;
 }
