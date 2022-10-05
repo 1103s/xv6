@@ -337,26 +337,24 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+
+  //find highest priority ONCE
+  //IMPLEMENT HERE
+
+  int top_priority = 19;
+
+  for(p = top_proc = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if(p->state == RUNNABLE && (p->priority < top_priority))//find highest priority among runnable processes
+      top_priority = p->priority;
+  }
+
     for(p = top_proc = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE){
-        top_proc++;
+      if(p->state != RUNNABLE)
         continue;
-      }
-      
-      // find the nice-est runnable process if that is turned on
-      if(PRIORITY && (top_proc->priority > p->priority)){
-        top_proc = p;
-        if(p < &ptable.proc[NPROC]){
-          continue;
-        } else {
-          p = top_proc;
-        }
-      }
 
-
-          
-          
-        
+      if(PRIORITY && (p->priority > top_priority)) //continue if priority is on and the process is lower (higher in value)
+        continue;
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
