@@ -20,6 +20,7 @@ printf(1, "%d failed in fork!\n", getpid());
 }
 else if(id > 0){ // parent
 printf(1, "Parent %d creating child %d\n", getpid(), id);
+wait();
 } else{ // child
 printf(1, "Child %d created\n", getpid());
 for(z = 0; z < 80000000.0; z += 0.01)
