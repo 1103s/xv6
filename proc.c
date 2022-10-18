@@ -8,7 +8,7 @@
 #include "spinlock.h"
 
 //Enable priority based secure
-#define PRIORITY 1
+#define PRIORITY 0
 
 struct {
   struct spinlock lock;
