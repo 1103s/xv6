@@ -180,6 +180,62 @@ growproc(int n)
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
+// BUT it keeps the shared memory.
+int
+thread_create(void (*fn) (void *), void *stack, void *arg)
+{
+  int i, pid;
+  struct proc *np;
+  struct proc *curproc = myproc();
+
+  // Allocate process.
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+
+  //link shared resources
+  np->sz = curproc->sz;
+  np->pgdir = np->pgdir;
+  np->kstack = stack;
+  np->parent = curproc;
+  np->priority = 10;
+  np->is_thread = 1;
+  *np->tf = *curproc->tf;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
+
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+
+  pid = np->pid;
+
+  //Set fake re
+  *(uint *)(np->kstack) = 0xFFFFFFFF;
+  //Set fake old bp
+  *(uint *)((np->kstack)+4) = 0xFFFFFFFF;
+  //push args to new stack
+  *(uint *)((np->kstack)+8) = *(uint *)arg;
+  //set eip to the requested function
+  np->context->eip = *(uint *)fn;
+
+  acquire(&ptable.lock);
+
+  np->state = RUNNABLE;
+
+  release(&ptable.lock);
+
+  return pid;
+}
+
+
+// Create a new process copying p as the parent.
+// Sets up stack to return as if from system call.
+// Caller must set state of returned proc to RUNNABLE.
 int
 fork(void)
 {
@@ -202,6 +258,7 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   np->priority = 10;
+  np->is_thread = 0;
   *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
@@ -223,6 +280,37 @@ fork(void)
   release(&ptable.lock);
 
   return pid;
+}
+
+//Exit a thread without clobering the shared memory
+int
+thread_exit(void)
+{
+  struct proc *curproc = myproc();
+  struct proc *p;
+
+  acquire(&ptable.lock);
+
+  // Parent might be sleeping in wait().
+  wakeup1(curproc->parent);
+
+  // Pass abandoned children to init.
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->parent == curproc){
+      p->parent = initproc;
+      if(p->state == ZOMBIE)
+        wakeup1(initproc);
+    }
+  }
+
+  // Jump into the scheduler, never to return.
+  curproc->state = ZOMBIE;
+  sched();
+  panic("zombie exit");
+  // i dont know why i need to 
+  // return an int here but its what the
+  // instructions say so yeah...
+  return 1;
 }
 
 // Exit the current process.  Does not return.
@@ -315,6 +403,47 @@ wait(void)
   }
 }
 
+// wait, but for a thread....
+int
+thread_join(void)
+{
+  struct proc *p;
+  int havekids, pid;
+  struct proc *curproc = myproc();
+  
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent != curproc)
+        continue;
+      havekids = 1;
+      if((p->state == ZOMBIE) && (p->is_thread)){
+        // Found one.
+        pid = p->pid;
+        p->kstack = 0;
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -373,6 +502,81 @@ scheduler(void)
     release(&ptable.lock);
 
   }
+}
+
+//Create a new thread lock.
+int
+lock_init(struct lock_t * lk)
+{
+  lk->thread = myproc();
+  lk->locked = 0;
+
+  //im not quite sure what to return as it dosent 
+  //say in the instructions so.... yeah
+  return lk->locked;
+}
+
+// Acquire the lock.
+// Loops (spins) until the lock is acquired.
+// Holding a lock for a long time may cause
+// other CPUs to waste time spinning to acquire it.
+int
+lock_acquire(struct lock_t *lk)
+{
+  pushcli(); // disable interrupts to avoid deadlock.
+  struct proc *cproc = myproc();
+  if(cproc == lk->thread){
+    cprintf("Thread already has lock....");
+    return -1;
+  }
+
+  // The xchg is atomic.
+  acquire(&tickslock);
+  while(xchg(&lk->locked, 1) != 0){
+    if(myproc()->killed){
+      release(&tickslock);
+      return -1;
+    }
+    sleep(&ticks, &tickslock);
+  };
+  release(&tickslock);
+
+  // Tell the C compiler and the processor to not move loads or stores
+  // past this point, to ensure that the critical section's memory
+  // references happen after the lock is acquired.
+  __sync_synchronize();
+
+  // Record info about lock acquisition for debugging.
+  lk->thread = myproc();
+  return 0;
+}
+
+// Release the lock.
+int
+lock_release(struct lock_t *lk)
+{
+  struct proc *cproc = myproc();
+  if(!(cproc == lk->thread)){
+    cprintf("Thread does not have lock....");
+    return -1;
+  }
+
+  lk->thread = 0;
+
+  // Tell the C compiler and the processor to not move loads or stores
+  // past this point, to ensure that all the stores in the critical
+  // section are visible to other cores before the lock is released.
+  // Both the C compiler and the hardware may re-order loads and
+  // stores; __sync_synchronize() tells them both not to.
+  __sync_synchronize();
+
+  // Release the lock, equivalent to lk->locked = 0.
+  // This code can't use a C assignment, since it might
+  // not be atomic. A real OS would use C atomics here.
+  asm volatile("movl $0, %0" : "+m" (lk->locked) : );
+
+  popcli();
+  return 0;
 }
 
 // Enter scheduler.  Must hold only ptable.lock

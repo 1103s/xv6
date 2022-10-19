@@ -50,7 +50,17 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   int priority;                // How nice the process is
+  int is_thread;               // is it a thread
 };
+
+// Mutual exclusion lock.
+struct lock_t {
+  uint locked;       // Is the lock held?
+
+  // For debugging:
+  struct proc *thread;   // The thread holding the lock.
+};
+
 
 // Process memory is laid out contiguously, low addresses first:
 //   text

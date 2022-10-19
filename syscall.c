@@ -109,6 +109,12 @@ extern int sys_uptime(void);
 extern int sys_set_priority(void);
 extern int sys_get_priority(void);
 extern int sys_cps(void);
+extern int sys_thread_create(void);
+extern int sys_thread_join(void);
+extern int sys_thread_exit(void);
+extern int sys_lock_init(void);
+extern int sys_lock_acquire(void);
+extern int sys_lock_release(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -135,6 +141,13 @@ static int (*syscalls[])(void) = {
 [SYS_set_priority]   sys_set_priority,
 [SYS_get_priority]   sys_get_priority,
 [SYS_cps]   sys_cps,
+
+[SYS_thread_create]   sys_thread_create,
+[SYS_thread_join]     sys_thread_join,
+[SYS_thread_exit]     sys_thread_exit,
+[SYS_lock_init]       sys_lock_init,
+[SYS_lock_acquire]    sys_lock_acquire,
+[SYS_lock_release]    sys_lock_release,
 };
 
 
@@ -163,6 +176,12 @@ const char *sys_call_names[] = {"Place Holder",
                 "set_priority",
                 "get_priority",
                 "cps",
+                "thread_create",
+                "thread_join",
+                "thread_exit",
+                "lock_init",
+                "lock_acquire",
+                "lock_release",
                 };
 void
 syscall(void)

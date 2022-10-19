@@ -26,6 +26,12 @@ int uptime(void);
 int set_priority(int, int);
 int get_priority(int);
 int cps(void);
+int thread_create(void (*) (void *), void *, void *);
+int thread_join(void);
+int thread_exit(void);
+int lock_init(struct lock_t*);
+int lock_acquire(struct lock_t*);
+int lock_release(struct lock_t*);
 
 // ulib.c
 int stat(const char*, struct stat*);

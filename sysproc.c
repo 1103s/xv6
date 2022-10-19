@@ -134,3 +134,74 @@ int sys_cps(void)
   return cps();
 
 }
+
+// Spawns a new thread with shared resources and a unique pid
+int sys_thread_create(void)
+{
+  char *fn;
+  char *stack;
+  char *arg;
+
+  // load fn
+  if(argptr(0, &fn, sizeof(unsigned int)) < 0)
+    return -1;
+
+  // load stack
+  if(argptr(0, &stack, sizeof(unsigned int)) < 0)
+    return -1;
+
+  // load arg
+  if(argptr(0, &arg, sizeof(unsigned int)) < 0)
+    return -1;
+
+  return thread_create((void *)fn, stack, arg);
+}
+
+
+// waits for a thread.
+int sys_thread_join(void)
+{
+  return thread_join();
+}
+
+// kills a thread.
+int sys_thread_exit(void)
+{
+  return thread_exit();
+}
+
+// create a new lock
+int sys_lock_init(void)
+{
+  char *lk;
+
+  // load lk
+  if(argptr(0, &lk, sizeof(unsigned int)) < 0)
+    return -1;
+
+  return lock_init((void *)lk);
+}
+
+// wait to aquire a lock
+int sys_lock_acquire(void)
+{
+  char *lk;
+
+  // load lk
+  if(argptr(0, &lk, sizeof(unsigned int)) < 0)
+    return -1;
+
+  return lock_acquire((void *)lk);
+}
+
+// drop a lock
+int sys_lock_release(void)
+{
+  char *lk;
+
+  // load lk
+  if(argptr(0, &lk, sizeof(unsigned int)) < 0)
+    return -1;
+
+  return lock_release((void *)lk);
+}

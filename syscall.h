@@ -23,3 +23,9 @@
 #define SYS_set_priority  22
 #define SYS_get_priority 23
 #define SYS_cps 24
+#define SYS_thread_create 25 
+#define SYS_thread_join 26   
+#define SYS_thread_exit 27   
+#define SYS_lock_init 28     
+#define SYS_lock_acquire 29  
+#define SYS_lock_release 30  
