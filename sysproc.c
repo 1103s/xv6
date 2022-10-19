@@ -147,11 +147,11 @@ int sys_thread_create(void)
     return -1;
 
   // load stack
-  if(argptr(0, &stack, sizeof(unsigned int)) < 0)
+  if(argptr(1, &stack, sizeof(unsigned int)) < 0)
     return -1;
 
   // load arg
-  if(argptr(0, &arg, sizeof(unsigned int)) < 0)
+  if(argptr(2, &arg, sizeof(unsigned int)) < 0)
     return -1;
 
   return thread_create((void *)fn, stack, arg);

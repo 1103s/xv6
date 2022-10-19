@@ -118,6 +118,63 @@ found:
   return p;
 }
 
+static struct proc*
+allocthread(void * fn, void * stack, void * arg)
+{
+  struct proc *p;
+  char *sp;
+
+  acquire(&ptable.lock);
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if(p->state == UNUSED)
+      goto found;
+
+  release(&ptable.lock);
+  return 0;
+
+found:
+  p->state = EMBRYO;
+  p->pid = nextpid++;
+
+  release(&ptable.lock);
+
+  // Allocate kernel stack.
+  if((p->kstack = kalloc()) == 0){
+    p->state = UNUSED;
+    return 0;
+  }
+  sp = p->kstack + KSTACKSIZE;
+  p->kstack = stack;
+  sp = stack;
+  //Set fake re
+  *(uint *)(p->kstack) = 0xFFFFFFFF;
+  //Set fake old bp
+  *(uint *)((p->kstack)-4) = 0xFFFFFFFF;
+  //push args to new stack
+  *(uint *)((p->kstack)-8) = (uint)arg;
+  sp -= 8;
+
+  // Leave room for trap frame.
+  sp -= sizeof *p->tf;
+  p->tf = (struct trapframe*)sp;
+  p->tf->eip = (uint)fn;
+  p->tf->esp = (uint)stack-8;
+  p->tf->ebp = (uint)stack-4;
+
+  // Set up new context to start executing at forkret,
+  // which returns to trapret.
+  sp -= 4;
+  *(uint*)sp = (uint)trapret;
+
+  sp -= sizeof *p->context;
+  p->context = (struct context*)sp;
+  memset(p->context, 0, sizeof *p->context);
+  p->context->eip = (uint)forkret;
+
+  return p;
+}
+
 //PAGEBREAK: 32
 // Set up first user process.
 void
@@ -189,18 +246,18 @@ thread_create(void (*fn) (void *), void *stack, void *arg)
   struct proc *curproc = myproc();
 
   // Allocate process.
-  if((np = allocproc()) == 0){
+  if((np = allocthread(fn, stack, arg)) == 0){
     return -1;
   }
 
   //link shared resources
   np->sz = curproc->sz;
-  np->pgdir = np->pgdir;
+  np->pgdir = curproc->pgdir;
   np->kstack = stack;
   np->parent = curproc;
   np->priority = 10;
   np->is_thread = 1;
-  *np->tf = *curproc->tf;
+  //*np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -214,20 +271,15 @@ thread_create(void (*fn) (void *), void *stack, void *arg)
 
   pid = np->pid;
 
-  //Set fake re
-  *(uint *)(np->kstack) = 0xFFFFFFFF;
-  //Set fake old bp
-  *(uint *)((np->kstack)+4) = 0xFFFFFFFF;
-  //push args to new stack
-  *(uint *)((np->kstack)+8) = *(uint *)arg;
   //set eip to the requested function
-  np->context->eip = *(uint *)fn;
 
+  pushcli();
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
 
   release(&ptable.lock);
+  popcli();
 
   return pid;
 }
@@ -286,6 +338,7 @@ fork(void)
 int
 thread_exit(void)
 {
+  cprintf("ahhh");
   struct proc *curproc = myproc();
   struct proc *p;
 
@@ -458,7 +511,6 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-  struct proc *top_proc;
   
   for(;;){
     // Enable interrupts on this processor.
@@ -466,23 +518,8 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-
-  //find highest priority ONCE
-  //IMPLEMENT HERE
-
-  int top_priority = 19;
-
-  for(p = top_proc = ptable.proc; p < &ptable.proc[NPROC]; p++)
-  {
-    if(p->state == RUNNABLE && (p->priority < top_priority))//find highest priority among runnable processes
-      top_priority = p->priority;
-  }
-
-    for(p = top_proc = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
-        continue;
-
-      if(PRIORITY && (p->priority > top_priority)) //continue if priority is on and the process is lower (higher in value)
         continue;
 
       // Switch to chosen process.  It is the process's job
@@ -684,17 +721,24 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
+    }
 }
 
 // Wake up all processes sleeping on chan.
 void
 wakeup(void *chan)
 {
+  //cprintf("[%d|%d]", ((struct proc *)chan)->pid,
+  //                   ((struct proc *)chan)->is_thread);
   acquire(&ptable.lock);
   wakeup1(chan);
   release(&ptable.lock);
+  //for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  //  if(p->state == RUNNABLE && p->chan == chan){
+  //    cprintf("[%d|%d]", p->pid, p->is_thread);
+  //  }
 }
 
 // Kill the process with the given pid.
