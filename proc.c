@@ -159,8 +159,8 @@ found:
   sp -= sizeof *p->tf;
   p->tf = (struct trapframe*)sp;
   p->tf->eip = (uint)fn;
-  p->tf->esp = (uint)stack-8;
-  p->tf->ebp = (uint)stack-4;
+  //p->tf->esp = (uint)stack-8;
+  //p->tf->ebp = (uint)stack-4;
 
   // Set up new context to start executing at forkret,
   // which returns to trapret.
@@ -234,12 +234,83 @@ growproc(int n)
   return 0;
 }
 
+int 
+thread_create(void (*fn)(void *args), 
+        void *stack, void *args) 
+{
+  struct proc *np;
+  struct proc *curproc = myproc();
+  int pid;
+  unsigned int sp;
+  unsigned int stack_args[2];
+      
+  // Spawn a new proc
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+
+  // size of the child clone is same as parent 
+  np->sz = curproc->sz;
+  np->parent = curproc;
+  
+
+  // share address space 
+  np->pgdir = curproc->pgdir; 
+  
+  // set base of stack 
+  np->kstack = (char *)stack;
+
+  // trap frame 
+  *np->tf = *curproc->tf;
+  
+  // set the stack 
+  stack_args[0] = (uint)0xFFFFFFFF;
+  stack_args[1] = (uint)args;
+
+  // set esp
+  sp = (uint)np->kstack;
+  sp -= 2 * 4;
+ 
+  if(copyout(np->pgdir, sp, 
+              stack_args, 2 * sizeof(uint)) == -1){
+    kfree(np->kstack);
+    np->kstack = 0;
+    np->state = UNUSED;
+    return -1;
+  }
+  
+  np->tf->eip = (uint)fn;
+  np->tf->esp = sp;  
+
+  for(int i = 0; i < NOFILE; i++){
+    if(curproc->ofile[i]){
+      np->ofile[i] = filedup(curproc->ofile[i]);
+    }
+  }
+  np->cwd = idup(curproc->cwd);
+
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+  
+  np->is_thread = 1;
+
+  pushcli();
+  acquire(&ptable.lock);
+
+  np->state = RUNNABLE;
+
+  release(&ptable.lock);
+  popcli();
+
+  pid = np->pid;
+  return pid;
+}
+
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
 // BUT it keeps the shared memory.
 int
-thread_create(void (*fn) (void *), void *stack, void *arg)
+thread_create_a(void (*fn) (void *), void *stack, void *arg)
 {
   int i, pid;
   struct proc *np;
@@ -338,7 +409,6 @@ fork(void)
 int
 thread_exit(void)
 {
-  cprintf("ahhh");
   struct proc *curproc = myproc();
   struct proc *p;
 
