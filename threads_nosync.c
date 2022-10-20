@@ -51,6 +51,7 @@ int main(int argc, char *argv[]) {
   t1 = thread_create(do_work, s1, (void*)&b1);
   t2 = thread_create(do_work, s2, (void*)&b2); 
 
+
   r1 = thread_join();
   r2 = thread_join();
   

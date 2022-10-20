@@ -536,6 +536,7 @@ thread_join(void)
   
   acquire(&ptable.lock);
   for(;;){
+    pushcli();
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -552,6 +553,7 @@ thread_join(void)
         p->killed = 0;
         p->state = UNUSED;
         release(&ptable.lock);
+        popcli();
         return pid;
       }
     }
@@ -559,10 +561,12 @@ thread_join(void)
     // No point waiting if we don't have any children.
     if(!havekids || curproc->killed){
       release(&ptable.lock);
+      popcli();
       return -1;
     }
 
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    popcli();
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
 }
