@@ -235,7 +235,71 @@ growproc(int n)
 }
 
 int 
-thread_create(void (*fn)(void *args), 
+thread_create(void (*fn)(void *args),
+              void* stack, void *args)
+{
+  struct proc *np;
+  struct proc *p = myproc();
+  void *sarg;
+  void *sret;
+
+  // Allocate process.
+  if((np = allocproc()) == 0)
+    return -1;
+
+  // setup shared resources
+  np->pgdir = p->pgdir;
+  np->sz = p->sz;
+  np->parent = p;
+  *np->tf = *p->tf;
+
+  // mark proc as thread
+  np->is_thread = 1;
+
+  // Setup stack with fake ret
+  sret = stack + PGSIZE - 3 * sizeof(void *);
+  *(uint*)sret = 0xFFFFFFF;
+
+  // Set args struch on the stack
+  sarg = stack + PGSIZE - 2 * sizeof(void *);
+  *(uint*)sarg = (uint)args;
+
+  // Set esp
+  np->tf->esp = (uint) stack;
+
+  // set address of stack
+  np->tstack = stack;
+
+  // Set esp and ebp
+  np->tf->esp += PGSIZE - 3 * sizeof(void*);
+  np->tf->ebp = np->tf->esp;
+
+  // Set eip 
+  np->tf->eip = (uint) fn;
+
+  // Returun 0 to child.
+  np->tf->eax = 0;
+
+  int i;
+  for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+      np->ofile[i] = filedup(p->ofile[i]);
+  np->cwd = idup(p->cwd);
+
+  safestrcpy(np->name, p->name, sizeof(p->name));
+
+  acquire(&ptable.lock);
+
+  np->state = RUNNABLE;
+
+  release(&ptable.lock);
+
+  return np->pid;
+}
+
+
+int 
+thread_create_b(void (*fn)(void *args), 
         void *stack, void *args) 
 {
   struct proc *np;
@@ -638,7 +702,6 @@ lock_init(struct lock_t * lk)
 int
 lock_acquire(struct lock_t *lk)
 {
-  cprintf("Locked");
   pushcli(); // disable interrupts to avoid deadlock.
   struct proc *cproc = myproc();
   if(cproc == lk->thread){

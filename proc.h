@@ -51,6 +51,7 @@ struct proc {
   char name[16];               // Process name (debugging)
   int priority;                // How nice the process is
   int is_thread;               // is it a thread
+  char *tstack;               // thread stack
 };
 
 // Mutual exclusion lock.
