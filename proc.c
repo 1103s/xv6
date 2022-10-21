@@ -252,6 +252,7 @@ thread_create(void (*fn)(void *args),
   // size of the child clone is same as parent 
   np->sz = curproc->sz;
   np->parent = curproc;
+  np->priority = 10;
   
 
   // share address space 
@@ -281,6 +282,7 @@ thread_create(void (*fn)(void *args),
   
   np->tf->eip = (uint)fn;
   np->tf->esp = sp;  
+  np->tf->ebp = sp;  
 
   for(int i = 0; i < NOFILE; i++){
     if(curproc->ofile[i]){
@@ -292,6 +294,8 @@ thread_create(void (*fn)(void *args),
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
   
   np->is_thread = 1;
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
 
   pushcli();
   acquire(&ptable.lock);
@@ -634,6 +638,7 @@ lock_init(struct lock_t * lk)
 int
 lock_acquire(struct lock_t *lk)
 {
+  cprintf("Locked");
   pushcli(); // disable interrupts to avoid deadlock.
   struct proc *cproc = myproc();
   if(cproc == lk->thread){
@@ -646,11 +651,15 @@ lock_acquire(struct lock_t *lk)
   while(xchg(&lk->locked, 1) != 0){
     if(myproc()->killed){
       release(&tickslock);
+      popcli();
       return -1;
     }
+    popcli();
     sleep(&ticks, &tickslock);
+    pushcli();
   };
   release(&tickslock);
+  popcli();
 
   // Tell the C compiler and the processor to not move loads or stores
   // past this point, to ensure that the critical section's memory
@@ -674,6 +683,7 @@ lock_release(struct lock_t *lk)
 
   lk->thread = 0;
 
+  pushcli();
   // Tell the C compiler and the processor to not move loads or stores
   // past this point, to ensure that all the stores in the critical
   // section are visible to other cores before the lock is released.
