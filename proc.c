@@ -118,63 +118,6 @@ found:
   return p;
 }
 
-static struct proc*
-allocthread(void * fn, void * stack, void * arg)
-{
-  struct proc *p;
-  char *sp;
-
-  acquire(&ptable.lock);
-
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == UNUSED)
-      goto found;
-
-  release(&ptable.lock);
-  return 0;
-
-found:
-  p->state = EMBRYO;
-  p->pid = nextpid++;
-
-  release(&ptable.lock);
-
-  // Allocate kernel stack.
-  if((p->kstack = kalloc()) == 0){
-    p->state = UNUSED;
-    return 0;
-  }
-  sp = p->kstack + KSTACKSIZE;
-  p->kstack = stack;
-  sp = stack;
-  //Set fake re
-  *(uint *)(p->kstack) = 0xFFFFFFFF;
-  //Set fake old bp
-  *(uint *)((p->kstack)-4) = 0xFFFFFFFF;
-  //push args to new stack
-  *(uint *)((p->kstack)-8) = (uint)arg;
-  sp -= 8;
-
-  // Leave room for trap frame.
-  sp -= sizeof *p->tf;
-  p->tf = (struct trapframe*)sp;
-  p->tf->eip = (uint)fn;
-  //p->tf->esp = (uint)stack-8;
-  //p->tf->ebp = (uint)stack-4;
-
-  // Set up new context to start executing at forkret,
-  // which returns to trapret.
-  sp -= 4;
-  *(uint*)sp = (uint)trapret;
-
-  sp -= sizeof *p->context;
-  p->context = (struct context*)sp;
-  memset(p->context, 0, sizeof *p->context);
-  p->context->eip = (uint)forkret;
-
-  return p;
-}
-
 //PAGEBREAK: 32
 // Set up first user process.
 void
@@ -234,6 +177,10 @@ growproc(int n)
   return 0;
 }
 
+// Create a new process copying p as the parent.
+// Sets up stack to return as if from system call.
+// Caller must set state of returned proc to RUNNABLE,
+// BUT some resources are shared in the way a thread does.
 int 
 thread_create(void (*fn)(void *args),
               void* stack, void *args)
@@ -296,133 +243,6 @@ thread_create(void (*fn)(void *args),
 
   return np->pid;
 }
-
-
-int 
-thread_create_b(void (*fn)(void *args), 
-        void *stack, void *args) 
-{
-  struct proc *np;
-  struct proc *curproc = myproc();
-  int pid;
-  unsigned int sp;
-  unsigned int stack_args[2];
-      
-  // Spawn a new proc
-  if((np = allocproc()) == 0){
-    return -1;
-  }
-
-  // size of the child clone is same as parent 
-  np->sz = curproc->sz;
-  np->parent = curproc;
-  np->priority = 10;
-  
-
-  // share address space 
-  np->pgdir = curproc->pgdir; 
-  
-  // set base of stack 
-  np->kstack = (char *)stack;
-
-  // trap frame 
-  *np->tf = *curproc->tf;
-  
-  // set the stack 
-  stack_args[0] = (uint)0xFFFFFFFF;
-  stack_args[1] = (uint)args;
-
-  // set esp
-  sp = (uint)np->kstack;
-  sp -= 2 * 4;
- 
-  if(copyout(np->pgdir, sp, 
-              stack_args, 2 * sizeof(uint)) == -1){
-    kfree(np->kstack);
-    np->kstack = 0;
-    np->state = UNUSED;
-    return -1;
-  }
-  
-  np->tf->eip = (uint)fn;
-  np->tf->esp = sp;  
-  np->tf->ebp = sp;  
-
-  for(int i = 0; i < NOFILE; i++){
-    if(curproc->ofile[i]){
-      np->ofile[i] = filedup(curproc->ofile[i]);
-    }
-  }
-  np->cwd = idup(curproc->cwd);
-
-  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
-  
-  np->is_thread = 1;
-  // Clear %eax so that fork returns 0 in the child.
-  np->tf->eax = 0;
-
-  pushcli();
-  acquire(&ptable.lock);
-
-  np->state = RUNNABLE;
-
-  release(&ptable.lock);
-  popcli();
-
-  pid = np->pid;
-  return pid;
-}
-
-// Create a new process copying p as the parent.
-// Sets up stack to return as if from system call.
-// Caller must set state of returned proc to RUNNABLE.
-// BUT it keeps the shared memory.
-int
-thread_create_a(void (*fn) (void *), void *stack, void *arg)
-{
-  int i, pid;
-  struct proc *np;
-  struct proc *curproc = myproc();
-
-  // Allocate process.
-  if((np = allocthread(fn, stack, arg)) == 0){
-    return -1;
-  }
-
-  //link shared resources
-  np->sz = curproc->sz;
-  np->pgdir = curproc->pgdir;
-  np->kstack = stack;
-  np->parent = curproc;
-  np->priority = 10;
-  np->is_thread = 1;
-  //*np->tf = *curproc->tf;
-
-  // Clear %eax so that fork returns 0 in the child.
-  np->tf->eax = 0;
-
-  for(i = 0; i < NOFILE; i++)
-    if(curproc->ofile[i])
-      np->ofile[i] = filedup(curproc->ofile[i]);
-  np->cwd = idup(curproc->cwd);
-
-  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
-
-  pid = np->pid;
-
-  //set eip to the requested function
-
-  pushcli();
-  acquire(&ptable.lock);
-
-  np->state = RUNNABLE;
-
-  release(&ptable.lock);
-  popcli();
-
-  return pid;
-}
-
 
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
